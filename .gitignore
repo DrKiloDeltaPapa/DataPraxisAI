@@ -1,0 +1,72 @@
+# =========================
+# Root
+# =========================
+.DS_Store
+*.swp
+*.swo
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+log/
+
+# =========================
+# Node / React (client)
+# =========================
+client/node_modules/
+client/dist/
+client/.vite/
+client/.cache/
+client/npm-debug.log*
+client/yarn-debug.log*
+client/yarn-error.log*
+client/pnpm-debug.log*
+
+# =========================
+# Python (server)
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pkl
+*.pickle
+*.joblib
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Virtualenvs
+venv/
+.venv/
+env/
+ENV/
+
+# =========================
+# Server data artifacts (RAG / embeddings / indexes)
+# Keep sample docs if you want, but do not version embeddings/index outputs
+# =========================
+server/data/embeddings.json
+server/data/*.faiss
+server/data/*.index
+server/data/*.bin
+server/data/chunks/
+server/data/indexes/
+server/data/embeddings/
+server/data/vector_db/
+
+# If blogs.json is your "database", you can keep it tracked.
+# If it becomes environment-specific later, move it to a DB and ignore it then.
+# server/data/blogs.json
+
+# =========================
+# OS / IDE
+# =========================
+.vscode/
+.idea/

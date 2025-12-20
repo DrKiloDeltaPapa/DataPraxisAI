@@ -1,0 +1,20 @@
+[
+  {
+    "_id": "675f1a01a3b4c9f0a1b2c301",
+    "title": "How Deep Learning Models Actually Learn: Gradients, Loss, and Optimization",
+    "description": "Deep learning models may look like magic from the outside, but under the hood they are powered by relatively simple mathematical ideas.",
+    "category": "Deep Dives",
+    "image": "/src/assets/blog_pic_1.png",
+    "createdAt": "2025-11-22T00:00:00.000Z",
+    "isPublished": true
+  },
+  {
+    "_id": "675f1a01a3b4c9f0a1b2c302",
+    "title": "Interpreting Black-Box Models: SHAP, LIME, and Model Explainability",
+    "description": "As ML systems move into high-stakes domains, model explainability becomes essential.",
+    "category": "Deep Dives",
+    "image": "/src/assets/blog_pic_2.png",
+    "createdAt": "2025-11-22T00:00:00.000Z",
+    "isPublished": true
+  }
+]
