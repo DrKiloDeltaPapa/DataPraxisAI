@@ -61,6 +61,14 @@ server/data/indexes/
 server/data/embeddings/
 server/data/vector_db/
 
+# Lakehouse (Seagate) — Never commit
+# The actual FAISS index, ID maps, metadata DB, and corpus live on external storage
+# These are environment-specific and too large for version control
+/mnt/seagate_ai_corpus/
+*.faiss
+*.idmap.json
+metadata.db
+
 # If blogs.json is your "database", you can keep it tracked.
 # If it becomes environment-specific later, move it to a DB and ignore it then.
 # server/data/blogs.json
