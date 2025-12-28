@@ -2,12 +2,13 @@ import React from 'react'
 import { useNavigate } from 'react-router-dom'
 
 const BlogCard = ({ blog }) => {
-  const { title, description, category, image, _id } = blog
+    const { title, description, category, image } = blog
+    const blogId = blog._id || blog.id
   const navigate = useNavigate()
 
 return (
     <div
-        onClick={() => navigate(`/blog/${_id}`)}
+        onClick={() => navigate(`/blog/${blogId}`)}
         className='w-full rounded-lg overflow-hidden shadow hover:scale-105 hover:shadow-primary/25 duration-300 cursor-pointer flex flex-col h-full'
     >
         <div className='relative w-full h-48 overflow-hidden bg-gray-100 rounded-t-lg'>

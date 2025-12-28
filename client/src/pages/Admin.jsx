@@ -232,6 +232,15 @@ const Admin = () => {
                 <ReactMarkdown>{generatedBlog.content_markdown}</ReactMarkdown>
               </div>
 
+              <div className='mb-6'>
+                <a
+                  href={`/blog/${generatedBlog.id}`}
+                  className='inline-flex items-center px-3 py-2 bg-blue-50 text-blue-700 rounded border border-blue-200 text-sm'
+                >
+                  View saved blog →
+                </a>
+              </div>
+
               {/* Sources / Citations */}
               {generatedBlog.sources && generatedBlog.sources.length > 0 && (
                 <div className='mt-8 p-4 bg-gray-50 rounded'>

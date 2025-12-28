@@ -40,7 +40,14 @@ const BlogList = () => {
       })
       .then((data) => {
         if (!mounted) return
-        setBlogs(Array.isArray(data) ? data : [])
+        const normalized = (Array.isArray(data) ? data : []).map((b) => ({
+          ...b,
+          _id: b._id || b.id || `blog-${Math.random().toString(36).slice(2, 8)}`,
+          category: b.category || 'AI Generated',
+          description: b.description || b.content_markdown || b.text || '',
+          image: b.image || '',
+        }))
+        setBlogs(normalized)
         setError(null)
       })
       .catch((err) => {
@@ -263,9 +270,12 @@ const BlogList = () => {
 
         <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-8 mb-24'>
           {(blogs || [])
-            .filter((blog) => (menu === 'All' ? true : blog.category === menu))
+            .filter((blog) => {
+              const cat = blog.category || 'AI Generated'
+              return menu === 'All' ? true : cat === menu
+            })
             .map((blog) => (
-              <BlogCard key={blog._id} blog={blog} />
+              <BlogCard key={blog._id || blog.id} blog={blog} />
             ))}
         </div>
       </div>

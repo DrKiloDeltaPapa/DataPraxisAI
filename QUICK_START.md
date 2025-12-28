@@ -18,7 +18,8 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # 3. Start backend (Terminal 1)
-python -m uvicorn main:app --reload
+cd ..
+python -m uvicorn server.main:app --reload
 
 # 4. In new terminal: Setup frontend
 cd client
@@ -52,7 +53,8 @@ EOF
 cd server
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-python -m uvicorn main:app --reload
+cd ..
+python -m uvicorn server.main:app --reload
 
 # 4. In new terminal: Frontend
 cd client

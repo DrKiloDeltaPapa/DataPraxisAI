@@ -77,7 +77,10 @@ RAG_MODE=local
 # Seagate paths will not be accessed; local embeddings.json is used instead
 ```
 
+pip install -r requirements.txt
 ### 3. Backend Setup
+
+> Run from the **repo root** so imports like `server.*` resolve correctly.
 
 ```bash
 cd server
@@ -86,11 +89,12 @@ cd server
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install Python dependencies (includes faiss-cpu)
+# Install Python dependencies (includes faiss-cpu and ollama client)
 pip install -r requirements.txt
 
-# Start the server (default: http://127.0.0.1:8000)
-python -m uvicorn main:app --reload
+# Back to repo root, then start FastAPI (default: http://127.0.0.1:8000)
+cd ..
+python -m uvicorn server.main:app --reload
 ```
 
 ### 4. Frontend Setup
