@@ -22,6 +22,7 @@ from server.services.vector_store import add_embedding, query
 from server.services.ingest import ingest_dir
 from server.services.training import export_training_dataset
 from server.services.rag_client import get_rag_client
+from server.services.llm import generate_blog as llm_generate_blog, check_ollama_availability
 
 APP_ROOT = os.path.dirname(__file__)
 DATA_DIR = os.path.join(APP_ROOT, 'data')
@@ -260,13 +261,10 @@ def rag_search(req: RAGSearchRequest):
 @app.post('/api/blog/generate')
 def blog_generate(req: BlogGenerateRequest):
     """
-    Generate a blog post using RAG-retrieved context.
+    Generate a blog post using RAG-retrieved context and LLM synthesis.
     
-    Retrieves relevant chunks, then (optionally) calls an LLM
-    to synthesize into a blog post.
-    
-    Currently returns a stub response with retrieved sources.
-    Full LLM synthesis depends on integration with Ollama or external LLM.
+    Retrieves relevant chunks, then calls LLM (Ollama/OpenAI/mock)
+    to synthesize into a professional blog post.
     
     Request:
         topic: str - blog topic / title
@@ -276,19 +274,11 @@ def blog_generate(req: BlogGenerateRequest):
     
     Response:
         {
+            "id": "blog_uuid",
             "title": "Generated Title",
             "content_markdown": "# ...",
-            "sources": [
-                {
-                    "id": "chunk_id",
-                    "score": 0.95,
-                    "title": "Source Title",
-                    "author": "Author Name",
-                    "url": "https://...",
-                    "path": "/source/file.txt"
-                },
-                ...
-            ]
+            "created_at": "2025-12-27T...",
+            "sources": [...]
         }
     """
     try:
@@ -305,13 +295,6 @@ def blog_generate(req: BlogGenerateRequest):
         rag_client = get_rag_client()
         search_results = rag_client.search(query_vector, top_k=top_k)
 
-        if not search_results:
-            return {
-                "title": req.topic,
-                "content_markdown": f"# {req.topic}\n\nNo relevant content found.",
-                "sources": [],
-            }
-
         # Build sources for response
         sources = [
             {
@@ -325,32 +308,57 @@ def blog_generate(req: BlogGenerateRequest):
             for r in search_results
         ]
 
-        # Build stub markdown content
-        # In production, this would call LLM (Ollama, OpenAI, etc.)
-        context_snippets = "\n\n".join(
-            f"**[{i+1}]** {r.get('text', '')[:200]}..."
-            for i, r in enumerate(search_results[:3])
+        # Build context snippets for LLM
+        if search_results:
+            context_snippets = "\n\n".join(
+                f"**Source [{i+1}]: {r.get('source', {}).get('title', 'Untitled')}**\n"
+                f"{r.get('text', '')[:500]}..."
+                for i, r in enumerate(search_results[:5])
+            )
+        else:
+            context_snippets = "(No relevant content found in knowledge base)"
+
+        # Generate blog content via LLM
+        content_markdown = llm_generate_blog(
+            topic=req.topic,
+            context_snippets=context_snippets,
+            audience=req.audience,
+            length=req.length,
         )
 
-        content_markdown = f"""# {req.topic}
+        # Generate blog ID and timestamp
+        import uuid
+        from datetime import datetime
+        blog_id = str(uuid.uuid4())[:8]
+        created_at = datetime.utcnow().isoformat()
 
-## Overview
-This blog post was generated using Retrieval-Augmented Generation (RAG) from your AI lakehouse.
-
-**Mode**: {RAG_MODE}
-**Audience**: {req.audience}
-**Length**: {req.length}
-
-## Key Points from Sources
-{context_snippets}
-
-## References
-See sources below for complete information.
-"""
-
-        return {
+        # Persist to blogs.json
+        blogs = _read_blogs()
+        blog_entry = {
+            "id": blog_id,
             "title": req.topic,
             "content_markdown": content_markdown,
+            "created_at": created_at,
+            "audience": req.audience,
+            "length": req.length,
+            "sources": sources,
+        }
+        blogs.append(blog_entry)
+        
+        try:
+            os.makedirs(DATA_DIR, exist_ok=True)
+            with open(BLOGS_FILE, 'w', encoding='utf-8') as f:
+                json.dump(blogs, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            import logging
+            logging.warning(f"Could not persist blog to {BLOGS_FILE}: {e}")
+            # Non-fatal; still return blog even if persistence failed
+
+        return {
+            "id": blog_id,
+            "title": req.topic,
+            "content_markdown": content_markdown,
+            "created_at": created_at,
             "sources": sources,
         }
 
@@ -380,3 +388,55 @@ def rag_status():
         "faiss_index_path": FAISS_INDEX_PATH if RAG_MODE == 'seagate' else None,
         "metadata_db_path": METADATA_DB_PATH if RAG_MODE == 'seagate' else None,
     }
+
+
+@app.get('/api/llm/status')
+def llm_status():
+    """
+    Get LLM synthesis status.
+    
+    Checks if configured LLM service is available.
+    """
+    from server.config import LLM_MODE, LLM_URL, LLM_MODEL
+    from server.services.llm import check_ollama_availability
+    
+    status = {
+        "mode": LLM_MODE,
+        "available": False,
+        "message": ""
+    }
+    
+    if LLM_MODE == 'ollama':
+        available = check_ollama_availability()
+        status["available"] = available
+        if available:
+            status["message"] = f"Ollama running at {LLM_URL}, model: {LLM_MODEL}"
+        else:
+            status["message"] = f"Ollama not running at {LLM_URL}. Start with: ollama run {LLM_MODEL}"
+    elif LLM_MODE == 'openai':
+        from server.config import OPENAI_API_KEY
+        status["available"] = bool(OPENAI_API_KEY)
+        status["message"] = "OpenAI API" + (" configured" if OPENAI_API_KEY else " NOT configured (set OPENAI_API_KEY env var)")
+    elif LLM_MODE == 'mock':
+        status["available"] = True
+        status["message"] = "Mock/template mode (no actual LLM)"
+    
+    return status
+
+
+@app.get('/api/blogs')
+def get_blogs():
+    """Get list of all generated blogs."""
+    blogs = _read_blogs()
+    # Return in reverse chronological order
+    return sorted(blogs, key=lambda b: b.get('created_at', ''), reverse=True)
+
+
+@app.get('/api/blogs/{blog_id}')
+def get_blog(blog_id: str):
+    """Get a specific blog by ID."""
+    blogs = _read_blogs()
+    for blog in blogs:
+        if blog.get('id') == blog_id:
+            return blog
+    raise HTTPException(status_code=404, detail=f"Blog {blog_id} not found")

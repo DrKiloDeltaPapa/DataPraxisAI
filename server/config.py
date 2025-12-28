@@ -49,6 +49,28 @@ TOP_K = int(os.getenv('TOP_K', '8'))
 RAG_AGENT_URL = os.getenv('RAG_AGENT_URL', 'http://127.0.0.1:9000')
 
 # ============================================================
+# LLM CONFIGURATION (Blog Synthesis)
+# ============================================================
+
+# LLM Mode: which service to use for blog content generation
+#   - ollama: Local LLM (free, recommended for Mac/Borg1)
+#   - openai: OpenAI API (requires OPENAI_API_KEY)
+#   - mock: Template-based fallback (no API needed)
+LLM_MODE = os.getenv('LLM_MODE', 'ollama').lower()
+
+# Ollama endpoint (local LLM service)
+# Default: http://127.0.0.1:11434 (Ollama default)
+# To start Ollama: brew install ollama && ollama run llama2
+LLM_URL = os.getenv('LLM_URL', 'http://127.0.0.1:11434')
+
+# Ollama model name
+# Popular options: llama2, neural-chat, mistral
+LLM_MODEL = os.getenv('LLM_MODEL', 'llama2')
+
+# OpenAI API key (required if LLM_MODE=openai)
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+
+# ============================================================
 # VALIDATION & LOGGING
 # ============================================================
 
@@ -82,3 +104,10 @@ def log_config():
         print(f"[RAG Config] Metadata DB: {METADATA_DB_PATH}")
     elif RAG_MODE == 'agent':
         print(f"[RAG Config] Agent URL: {RAG_AGENT_URL}")
+    
+    print(f"[LLM Config] Mode: {LLM_MODE}")
+    if LLM_MODE == 'ollama':
+        print(f"[LLM Config] Ollama URL: {LLM_URL}")
+        print(f"[LLM Config] Model: {LLM_MODEL}")
+    elif LLM_MODE == 'openai':
+        print(f"[LLM Config] OpenAI API key: {'set' if OPENAI_API_KEY else 'not set'}")
