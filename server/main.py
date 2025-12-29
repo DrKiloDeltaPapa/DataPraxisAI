@@ -1,5 +1,8 @@
+
 import os
 import json
+import logging
+import traceback
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -218,44 +221,36 @@ def rag_search(req: RAGSearchRequest):
         503: Lakehouse not available (seagate mode, paths not found)
         500: Embedding dimension mismatch or other server error
     """
-    try:
-        # Validate config before searching
-        config_valid, config_error = validate_config()
-        if not config_valid and RAG_MODE == 'seagate':
-            return {
-                "status": "error",
-                "message": f"Lakehouse not available: {config_error}. "
-                           f"Confirm {FAISS_INDEX_PATH} and {METADATA_DB_PATH} are accessible.",
-                "results": [],
-            }
-
-        # Embed query
-        query_vector = embed_text(req.query)
-        if not query_vector:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to embed query; check embeddings service"
-            )
-
-        # Determine top_k
-        top_k = req.top_k if req.top_k else CONFIG_TOP_K
-
-        # Search via RAG adapter
-        rag_client = get_rag_client()
-        results = rag_client.search(query_vector, top_k=top_k)
-
+    # Validate config before searching
+    config_valid, config_error = validate_config()
+    if not config_valid and RAG_MODE == 'seagate':
         return {
-            "status": "ok",
-            "mode": RAG_MODE,
-            "results": results,
+            "status": "error",
+            "message": f"Lakehouse not available: {config_error}. "
+                       f"Confirm {FAISS_INDEX_PATH} and {METADATA_DB_PATH} are accessible.",
+            "results": [],
         }
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"RAG search failed: {str(e)}")
+    # Embed query
+    query_vector = embed_text(req.query)
+    if not query_vector:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to embed query; check embeddings service"
+        )
+
+    # Determine top_k
+    top_k = req.top_k if req.top_k else CONFIG_TOP_K
+
+    # Search via RAG adapter
+    rag_client = get_rag_client()
+    results = rag_client.search(query_vector, top_k=top_k)
+
+    return {
+        "status": "ok",
+        "mode": RAG_MODE,
+        "results": results,
+    }
 
 
 @app.post('/api/blog/generate')
@@ -281,93 +276,105 @@ def blog_generate(req: BlogGenerateRequest):
             "sources": [...]
         }
     """
-    try:
-        # Embed topic as query
-        query_vector = embed_text(req.topic)
-        if not query_vector:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to embed topic"
-            )
-
-        # Retrieve relevant chunks
-        top_k = req.top_k if req.top_k else CONFIG_TOP_K
-        rag_client = get_rag_client()
-        search_results = rag_client.search(query_vector, top_k=top_k)
-
-        # Build sources for response
-        sources = [
-            {
-                "id": r.get("id", ""),
-                "score": r.get("score", 0),
-                "title": r.get("source", {}).get("title", "Untitled"),
-                "author": r.get("source", {}).get("author", "Unknown"),
-                "url": r.get("source", {}).get("url", ""),
-                "path": r.get("source", {}).get("source_path", ""),
-            }
-            for r in search_results
-        ]
-
-        # Build context snippets for LLM
-        if search_results:
-            context_snippets = "\n\n".join(
-                f"**Source [{i+1}]: {r.get('source', {}).get('title', 'Untitled')}**\n"
-                f"{r.get('text', '')[:500]}..."
-                for i, r in enumerate(search_results[:5])
-            )
-        else:
-            context_snippets = "(No relevant content found in knowledge base)"
-
-        # Generate blog content via LLM
-        content_markdown = llm_generate_blog(
-            topic=req.topic,
-            context_snippets=context_snippets,
-            audience=req.audience,
-            length=req.length,
+    # Embed topic as query
+    query_vector = embed_text(req.topic)
+    if not query_vector:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to embed topic"
         )
 
-        # Generate blog ID and timestamp
-        import uuid
-        from datetime import datetime
-        blog_id = str(uuid.uuid4())[:8]
-        created_at = datetime.utcnow().isoformat()
+    # Retrieve relevant chunks
+    top_k = req.top_k if req.top_k else CONFIG_TOP_K
+    rag_client = get_rag_client()
+    search_results = rag_client.search(query_vector, top_k=top_k)
 
-        # Persist to blogs.json
-        blogs = _read_blogs()
-        blog_entry = {
-            "id": blog_id,
-            "title": req.topic,
-            "content_markdown": content_markdown,
-            "created_at": created_at,
-            "audience": req.audience,
-            "length": req.length,
-            "sources": sources,
+    # Build sources for response
+    sources = [
+        {
+            "id": r.get("id", ""),
+            "score": r.get("score", 0),
+            "title": r.get("source", {}).get("title", "Untitled"),
+            "author": r.get("source", {}).get("author", "Unknown"),
+            "url": r.get("source", {}).get("url", ""),
+            "path": r.get("source", {}).get("source_path", ""),
         }
-        blogs.append(blog_entry)
-        
-        try:
-            os.makedirs(DATA_DIR, exist_ok=True)
-            with open(BLOGS_FILE, 'w', encoding='utf-8') as f:
-                json.dump(blogs, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            import logging
-            logging.warning(f"Could not persist blog to {BLOGS_FILE}: {e}")
-            # Non-fatal; still return blog even if persistence failed
+        for r in search_results
+    ]
 
-        return {
-            "id": blog_id,
-            "title": req.topic,
-            "content_markdown": content_markdown,
-            "created_at": created_at,
-            "sources": sources,
-        }
+    # Build context snippets for LLM
+    if search_results:
+        context_snippets = "\n\n".join(
+            f"**Source [{i+1}]: {r.get('source', {}).get('title', 'Untitled')}**\n"
+            f"{r.get('text', '')[:500]}..."
+            for i, r in enumerate(search_results[:5])
+        )
+    else:
+        context_snippets = "(No relevant content found in knowledge base)"
 
-    except HTTPException:
-        raise
+    # Generate blog content via LLM
+    content_markdown = llm_generate_blog(
+        topic=req.topic,
+        context_snippets=context_snippets,
+        audience=req.audience,
+        length=req.length,
+    )
+
+    # Generate blog ID and timestamp
+    import uuid
+    from datetime import datetime
+    import random
+    blog_id = str(uuid.uuid4())[:8]
+    created_at = datetime.utcnow().isoformat()
+
+    # Select a random image from assets (blog_pic_1.png ... blog_pic_14.png)
+    image_choices = [f"/src/assets/blog_pic_{i}.png" for i in range(1, 15)]
+    image = random.choice(image_choices)
+
+    # Enforce new blog format in markdown (title, subtitle, date, image, structured markdown)
+    # If the LLM output does not include a title, prepend it
+    # We'll prepend a YAML frontmatter block for structure
+    title = req.topic
+    subtitle = f"A DataPraxisAI blog for {req.audience} readers"
+    date = created_at.split("T")[0]
+    frontmatter = f"""---\ntitle: {title}\nsubtitle: {subtitle}\ndate: {date}\nimage: {image}\n---\n\n"""
+    if not content_markdown.strip().lower().startswith("#") and not content_markdown.strip().lower().startswith("---"):
+        # Prepend title as H1 if not present
+        content_markdown = f"# {title}\n\n" + content_markdown
+    # Prepend frontmatter
+    content_markdown = frontmatter + content_markdown
+
+    # Persist to blogs.json
+    blogs = _read_blogs()
+    blog_entry = {
+        "id": blog_id,
+        "title": title,
+        "subtitle": subtitle,
+        "content_markdown": content_markdown,
+        "created_at": created_at,
+        "image": image,
+        "audience": req.audience,
+        "length": req.length,
+        "sources": sources,
+    }
+    blogs.append(blog_entry)
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        with open(BLOGS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(blogs, f, indent=2, ensure_ascii=False)
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Blog generation failed: {str(e)}")
+        logging.warning(f"Could not persist blog to {BLOGS_FILE}: {e}")
+        # Non-fatal; still return blog even if persistence failed
+
+    return {
+        "id": blog_id,
+        "title": title,
+        "subtitle": subtitle,
+        "content_markdown": content_markdown,
+        "created_at": created_at,
+        "image": image,
+        "sources": sources,
+    }
 
 
 @app.get('/api/rag/status')
@@ -412,7 +419,7 @@ def llm_status():
         if available:
             status["message"] = f"Ollama running at {LLM_URL}, model: {LLM_MODEL}"
         else:
-            status["message"] = f"Ollama not running at {LLM_URL}. Start with: ollama run {LLM_MODEL}"
+            status["message"] = f"Ollama not running at {LLM_URL}. Start with: ollama run {LLM_MODEL} (e.g., ollama run llama3.1:8b)"
     elif LLM_MODE == 'openai':
         from server.config import OPENAI_API_KEY
         status["available"] = bool(OPENAI_API_KEY)

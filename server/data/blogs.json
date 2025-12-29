@@ -16,5 +16,229 @@
     "image": "/src/assets/blog_pic_2.png",
     "createdAt": "2025-11-22T00:00:00.000Z",
     "isPublished": true
+  },
+  {
+    "id": "0c67ffd2",
+    "title": "DataPraxisAI overview",
+    "content_markdown": "\n## Introduction\nThis is a blog post generated in mock mode because no LLM service was available.\n\nThe system attempted to use RAG (Retrieval-Augmented Generation) to find relevant context,\nbut since the LLM synthesis layer was unavailable, a template response is shown instead.\n\n### What Happened\n1. Your search query was embedded and sent to the vector store\n2. Relevant chunks were retrieved from the database\n3. These chunks would normally be used to synthesize a real blog post via LLM\n4. Since the LLM is offline, you're seeing this placeholder\n\n### Next Steps\n- **On Mac**: Start Ollama (`ollama run llama2`) and try again\n- **On Borg1**: The system will use local Ollama or configured LLM\n- **In Production**: Configure OpenAI API key for reliable synthesis\n\n### To Fix This\n1. Install Ollama: https://ollama.ai\n2. Run: `ollama run llama2`\n3. Reload the admin page and try generating again\n\n---\n*This message appears when no LLM service is available. Configure LLM_MODE in .env to use Ollama or OpenAI.*\n",
+    "created_at": "2025-12-28T23:38:59.839028",
+    "audience": "general",
+    "length": "medium",
+    "sources": [
+      {
+        "id": "60482abf-bd11-4fa0-a76f-626490a7defc",
+        "score": 0.6437443622253047,
+        "title": "2508.13124v1",
+        "author": "",
+        "url": "",
+        "path": ""
+      },
+      {
+        "id": "ad047eed-e6ce-415d-ba4f-d30d14b1fe35",
+        "score": 0.6437443622253047,
+        "title": "2508.13124v1",
+        "author": "",
+        "url": "",
+        "path": ""
+      },
+      {
+        "id": "379fc1b3-e623-45ed-a1be-573e98b3e6f5",
+        "score": 0.7110652397454625,
+        "title": "2511.13408v2",
+        "author": "",
+        "url": "",
+        "path": ""
+      },
+      {
+        "id": "d40d4b35-7c79-4aee-8636-6ecc0e49e0d9",
+        "score": 0.7110652397454625,
+        "title": "2511.13408v2",
+        "author": "",
+        "url": "",
+        "path": ""
+      },
+      {
+        "id": "37e1e52e-46b0-4e73-b341-9712606be48a",
+        "score": 0.7129341381335559,
+        "title": "2510.23131v1",
+        "author": "",
+        "url": "",
+        "path": ""
+      },
+      {
+        "id": "5789dfdd-9870-4f02-9da9-60e1e2c1a42d",
+        "score": 0.7129341381335559,
+        "title": "2510.23131v1",
+        "author": "",
+        "url": "",
+        "path": ""
+      },
+      {
+        "id": "0d5baca0-7181-4f93-bcb3-6f1e6e4df3a2",
+        "score": 0.7325718416143917,
+        "title": "2510.04939v1",
+        "author": "",
+        "url": "",
+        "path": ""
+      },
+      {
+        "id": "c69191e7-7f84-4317-98b7-c02ccbecedd4",
+        "score": 0.7325718416143917,
+        "title": "2510.04939v1",
+        "author": "",
+        "url": "",
+        "path": ""
+      }
+    ]
+  },
+  {
+    "id": "990561b1",
+    "title": "\"Introduction to Vector Databases\"",
+    "content_markdown": "**Introduction to Vector Databases**\n\nA vector database is a type of NoSQL database that stores and retrieves data as vectors, which are mathematical representations of entities in multiple dimensions. In this article, we will introduce the concept of vector databases and explore how they work.\n\n**What are Vectors?**\n\nVectors are arrays of numbers that represent points or objects in a multi-dimensional space. For example, if you have a point with coordinates (x, y), you can represent it as a 2D vector [x, y]. If you want to add more dimensions, such as color, you can extend the vector to [x, y, r, g, b], where r, g, and b are the red, green, and blue values of the point.\n\n**Vector Databases: A New Type of Database**\n\nTraditional databases store data in tables with rows and columns. However, this structure becomes cumbersome when dealing with high-dimensional data, such as images or videos. Vector databases, on the other hand, use vectors to represent entities and provide efficient storage and retrieval mechanisms for multi-dimensional data.\n\n**Example Use Cases**\n\nVector databases are useful in various applications where data has multiple dimensions. Here are a few examples:\n\n* **Image Search**: Given an image, a vector database can store its features as vectors and enable search queries like \"find similar images.\"\n* **Text Analysis**: Text can be represented as vectors using techniques like word embeddings or text encoding. A vector database can then perform tasks like document similarity analysis.\n* **Recommendation Systems**: Vector databases can store user preferences and item attributes as vectors, allowing for efficient recommendation of items to users based on their past behavior.\n\n**Drone Control Example**\n\nThe provided source material ([Source 5: 2510.00259v1](https://arxiv.org/abs/2510.00259v1)) presents a scenario where two drones are controlled using vectors. The example illustrates how vector operations can be used to specify tasks for the drones, such as moving forward or taking pictures.\n\n| Task | Vector Operation |\n| --- | --- |\n| Fly drone 1 forward 2m | `d1 = d1 + [0, 0, 2, 0]` |\n| Take a picture with drone 2 | `d2 = take_picture(d2)` |\n| Rotate both drones 180 degrees | `d1 = rotate(d1, π)`, `d2 = rotate(d2, π)` |\n\n**Vector Operations**\n\nVector databases support various operations on vectors, such as:\n\n* **Element-wise addition**: Adding two vectors element-wise, e.g., `[a, b] + [c, d] = [a+c, b+d]`.\n* **Scalar multiplication**: Multiplying a vector by a scalar, e.g., `k * [a, b] = [ka, kb]`.\n* **Matrix-vector multiplication**: Multiplying a matrix by a vector, e.g., `[a, b; c, d] * [e, f]^T = [ae+bc, af+bd]^T`.\n\n**Conclusion**\n\nVector databases provide an innovative approach to storing and retrieving multi-dimensional data. By representing entities as vectors, these databases enable efficient operations on high-dimensional data and offer a range of use cases in fields like computer vision, natural language processing, and recommendation systems.\n\nAs the adoption of vector databases grows, we can expect new applications and techniques to emerge, further extending the capabilities of this promising technology.",
+    "created_at": "2025-12-28T23:52:21.721226",
+    "audience": "general",
+    "length": "medium",
+    "sources": [
+      {
+        "id": "3dc8fb28-0ae3-4a23-9241-b280351032a5",
+        "score": 0.5911714159033811,
+        "title": "2510.25595v1",
+        "author": "",
+        "url": "",
+        "path": ""
+      },
+      {
+        "id": "d702d275-9b2f-4fc4-afe6-7fca8cdb87cd",
+        "score": 0.5911714159033811,
+        "title": "2510.25595v1",
+        "author": "",
+        "url": "",
+        "path": ""
+      },
+      {
+        "id": "0c1d86be-acd5-4ca7-a9e6-5a06208c41f2",
+        "score": 0.5911714159033811,
+        "title": "2510.25595v1",
+        "author": "",
+        "url": "",
+        "path": ""
+      },
+      {
+        "id": "bc338de1-f552-4e6c-b8ff-2e13961ae099",
+        "score": 0.5911714159033811,
+        "title": "2510.25595v1",
+        "author": "",
+        "url": "",
+        "path": ""
+      },
+      {
+        "id": "6e0b1803-f9c3-4b24-8d9b-2467da37dc44",
+        "score": 0.6002391695289792,
+        "title": "2510.00259v1",
+        "author": "",
+        "url": "",
+        "path": ""
+      },
+      {
+        "id": "953fbd22-781b-41a2-9aa9-149e92255f42",
+        "score": 0.6002391695289792,
+        "title": "2510.00259v1",
+        "author": "",
+        "url": "",
+        "path": ""
+      },
+      {
+        "id": "b3e9511b-b7be-4b6c-9984-55b118c27914",
+        "score": 0.6002391910037622,
+        "title": "2510.00259v1",
+        "author": "",
+        "url": "",
+        "path": ""
+      },
+      {
+        "id": "41c60b0e-f699-4e44-89a8-6ac8e8753bab",
+        "score": 0.6044707416436608,
+        "title": "2508.20148v2",
+        "author": "",
+        "url": "",
+        "path": ""
+      }
+    ]
+  },
+  {
+    "id": "e77be38b",
+    "title": "How Embedding Works",
+    "subtitle": "A DataPraxisAI blog for general readers",
+    "content_markdown": "---\ntitle: How Embedding Works\nsubtitle: A DataPraxisAI blog for general readers\ndate: 2025-12-29\nimage: /src/assets/blog_pic_3.png\n---\n\n# How Embedding Works\n\n**How Embedding Works: Understanding the Power of Context**\n\nEmbedding is a fundamental concept in various fields, from history to science and entertainment. It refers to the process of placing one object or idea within another, creating a new whole that is more than the sum of its parts. In this blog post, we will explore how embedding works using examples from different sources.\n\n**What is Embedding?**\n\nEmbedding is a process where an object or idea is inserted into another context, often to create a new meaning or significance. This can be seen in various forms, such as:\n\n* Historical records: The burial of Carloman I, joint king of the Franks with his brother, in a 4th-century Roman sarcophagus in the abbey of Saint-Remi in Reims (Source [1]). This embedding of historical figures and events into a specific context helps us understand their significance.\n* Fictional universes: The creation of fictional characters like Wildfire from the DC Comics superhero series Legion of Super-Heroes (Source [2]). Embedding these characters within a richly detailed universe allows readers to become immersed in the story.\n\n**Embedding in Music**\n\nMusic is another area where embedding plays a crucial role. For example, the album \"The Greatest Show on Earth\" by Iron Maiden was inspired by Richard Dawkins' book of the same name (Source [3]). This embedding of scientific concepts into music allows artists to convey complex ideas through creative expression.\n\n**Embedding in Food Culture**\n\nFood is also an area where embedding can be seen. The city of Semarang, Indonesia is known for its rich food culture, with dishes like Bandeng presto and Lumpia (Source [4]). This embedding of culinary traditions into a specific context helps us understand the cultural significance of these foods.\n\n**Embedding in Art and Music**\n\nThe life and work of Capital STEEZ, an American rapper from New York City, is another example of embedding. His music was deeply personal and reflected his experiences growing up in Brooklyn (Source [5]). This embedding of artistic expression into a specific context helps us understand the artist's message.\n\n**Conclusion**\n\nEmbedding is a powerful concept that can be seen in various fields. By placing objects or ideas within other contexts, we create new meanings and significances. Whether it's historical records, fictional universes, music, food culture, or art, embedding helps us understand the significance of these concepts. As we explore the world around us, it is essential to recognize the role of embedding in shaping our understanding.\n\n**References**\n\n* [1] Source: data\n* [2] Source: laion_oig_000049363\n* [3] Source: laion_oig_000043299\n* [4] Source: data\n* [5] Source: data",
+    "created_at": "2025-12-29T00:24:06.193698",
+    "image": "/src/assets/blog_pic_3.png",
+    "audience": "general",
+    "length": "medium",
+    "sources": [
+      {
+        "id": "58ea7fde-1e19-413d-8229-61136d95dbcc",
+        "score": 0.6484660710740121,
+        "title": "data",
+        "author": "",
+        "url": "",
+        "path": ""
+      },
+      {
+        "id": "bf3e5137-ee46-43fa-9e47-ec4c15edaacc",
+        "score": 0.6655022279578976,
+        "title": "laion_oig_000049363",
+        "author": "",
+        "url": "",
+        "path": ""
+      },
+      {
+        "id": "97069c24-7060-4579-916c-8497c4ea485c",
+        "score": 0.6720617316224508,
+        "title": "laion_oig_000043299",
+        "author": "",
+        "url": "",
+        "path": ""
+      },
+      {
+        "id": "478f081d-a691-427c-8e3e-5d9cf6a04e7c",
+        "score": 0.6745706116001331,
+        "title": "data",
+        "author": "",
+        "url": "",
+        "path": ""
+      },
+      {
+        "id": "ce1ea88d-a5ce-4880-a6ba-4c6499286969",
+        "score": 0.688365611843478,
+        "title": "data",
+        "author": "",
+        "url": "",
+        "path": ""
+      },
+      {
+        "id": "7912cfd9-6dc8-4481-a3d8-abee866dae59",
+        "score": 0.693331304513722,
+        "title": "2509.24592v1",
+        "author": "",
+        "url": "",
+        "path": ""
+      },
+      {
+        "id": "ebc82610-8917-4312-94ad-cab165220587",
+        "score": 0.6933313761448479,
+        "title": "2509.24592v1",
+        "author": "",
+        "url": "",
+        "path": ""
+      },
+      {
+        "id": "98146237-2877-40a0-9b43-b69dad05f700",
+        "score": 0.7027971612001646,
+        "title": "data",
+        "author": "",
+        "url": "",
+        "path": ""
+      }
+    ]
   }
 ]

@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 LLM_MODE = os.getenv('LLM_MODE', 'ollama').lower()  # ollama, openai, mock
 LLM_URL = os.getenv('LLM_URL', 'http://127.0.0.1:11434')  # Ollama default
-LLM_MODEL = os.getenv('LLM_MODEL', 'llama2')  # Ollama model
+LLM_MODEL = os.getenv("OLLAMA_MODEL") or os.getenv("LLM_MODEL", "llama3.1:8b")  # Ollama model
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 
 
@@ -34,7 +34,7 @@ def call_ollama(prompt: str, model: str = LLM_MODEL) -> Optional[str]:
     
     Args:
         prompt: Full prompt for LLM
-        model: Model name (e.g., 'llama2', 'neural-chat', 'mistral')
+        model: Model name (e.g., 'llama3.1:8b', 'llama3:latest', 'qwen2.5-coder:7b')
     
     Returns:
         Generated text or None if failed

@@ -58,14 +58,15 @@ RAG_AGENT_URL = os.getenv('RAG_AGENT_URL', 'http://127.0.0.1:9000')
 #   - mock: Template-based fallback (no API needed)
 LLM_MODE = os.getenv('LLM_MODE', 'ollama').lower()
 
+
 # Ollama endpoint (local LLM service)
 # Default: http://127.0.0.1:11434 (Ollama default)
-# To start Ollama: brew install ollama && ollama run llama2
+# To start Ollama: brew install ollama && ollama run llama3.1:8b
 LLM_URL = os.getenv('LLM_URL', 'http://127.0.0.1:11434')
 
-# Ollama model name
-# Popular options: llama2, neural-chat, mistral
-LLM_MODEL = os.getenv('LLM_MODEL', 'llama2')
+# Ollama model name (default: llama3.1:8b)
+# Popular options: llama3.1:8b, llama3:latest, qwen2.5-coder:7b
+LLM_MODEL = os.getenv("OLLAMA_MODEL") or os.getenv("LLM_MODEL", "llama3.1:8b")
 
 # OpenAI API key (required if LLM_MODE=openai)
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
