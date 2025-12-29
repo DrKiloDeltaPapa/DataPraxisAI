@@ -1,7 +1,18 @@
+
 import React from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import { blog_data } from '../assets/assets'
+
+// Utility to strip YAML frontmatter from markdown
+function stripFrontmatter(md) {
+  if (!md) return '';
+  if (md.startsWith('---')) {
+    const end = md.indexOf('---', 3);
+    if (end !== -1) return md.slice(end + 3).replace(/^\s+/, '');
+  }
+  return md;
+}
 
 const Blog = () => {
   const { id } = useParams()
@@ -106,7 +117,7 @@ const Blog = () => {
 
       <section className='prose max-w-none prose-lg'>
         {post.content_markdown ? (
-          <ReactMarkdown>{post.content_markdown}</ReactMarkdown>
+          <ReactMarkdown>{stripFrontmatter(post.content_markdown)}</ReactMarkdown>
         ) : (
           <div dangerouslySetInnerHTML={{ __html: post.description || '' }} />
         )}

@@ -1,5 +1,88 @@
+
 import React from 'react'
 import ReactMarkdown from 'react-markdown'
+// Utility to strip YAML frontmatter from markdown
+function stripFrontmatter(md) {
+  if (!md) return '';
+  if (md.startsWith('---')) {
+    const end = md.indexOf('---', 3);
+    if (end !== -1) return md.slice(end + 3).replace(/^\s+/, '');
+  }
+  return md;
+}
+  // Blog management state
+  const [blogs, setBlogs] = React.useState([])
+  const [blogsLoading, setBlogsLoading] = React.useState(false)
+  const [blogsError, setBlogsError] = React.useState(null)
+  const [editBlogId, setEditBlogId] = React.useState(null)
+  const [editFields, setEditFields] = React.useState({})
+  const [deleteLoading, setDeleteLoading] = React.useState(null)
+
+  // Fetch all blogs for management
+  const fetchBlogs = async () => {
+    setBlogsLoading(true)
+    setBlogsError(null)
+    try {
+      const res = await fetch('/api/blogs')
+      if (!res.ok) throw new Error('Failed to fetch blogs')
+      const data = await res.json()
+      setBlogs(data)
+    } catch (e) {
+      setBlogsError(e.message)
+    } finally {
+      setBlogsLoading(false)
+    }
+  }
+
+  React.useEffect(() => {
+    fetchStatuses()
+    fetchStatus()
+    fetchBlogs()
+  }, [])
+  // Blog delete handler
+  const handleDeleteBlog = async (id) => {
+    if (!window.confirm('Delete this blog?')) return
+    setDeleteLoading(id)
+    try {
+      const res = await fetch(`/api/blogs/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Delete failed')
+      await fetchBlogs()
+    } catch (e) {
+      alert('Delete failed: ' + e.message)
+    } finally {
+      setDeleteLoading(null)
+    }
+  }
+
+  // Blog edit handlers
+  const startEditBlog = (blog) => {
+    setEditBlogId(blog.id)
+    setEditFields({
+      title: blog.title || '',
+      subtitle: blog.subtitle || '',
+      image: blog.image || '',
+      content_markdown: blog.content_markdown || '',
+    })
+  }
+  const cancelEditBlog = () => {
+    setEditBlogId(null)
+    setEditFields({})
+  }
+  const saveEditBlog = async (id) => {
+    try {
+      const res = await fetch(`/api/blogs/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editFields),
+      })
+      if (!res.ok) throw new Error('Update failed')
+      setEditBlogId(null)
+      setEditFields({})
+      await fetchBlogs()
+    } catch (e) {
+      alert('Update failed: ' + e.message)
+    }
+  }
 
 const Admin = () => {
   const [activeTab, setActiveTab] = React.useState('generate') // 'generate' or 'search'
@@ -229,7 +312,11 @@ const Admin = () => {
             <div className='mt-8 pt-8 border-t'>
               <div className='prose prose-sm max-w-none mb-8'>
                 <h2>{generatedBlog.title}</h2>
-                <ReactMarkdown>{generatedBlog.content_markdown}</ReactMarkdown>
+                {/* Hide YAML frontmatter in preview */}
+                {generatedBlog.image && (
+                  <img src={generatedBlog.image} alt={generatedBlog.title} className='w-full rounded mb-4 max-h-72 object-cover' />
+                )}
+                <ReactMarkdown>{stripFrontmatter(generatedBlog.content_markdown)}</ReactMarkdown>
               </div>
 
               <div className='mb-6'>
@@ -268,6 +355,83 @@ const Admin = () => {
               )}
             </div>
           )}
+
+      {/* Blog Management Section */}
+      <section className='mb-12'>
+        <h3 className='text-xl font-semibold mb-4'>Manage Blogs</h3>
+        {blogsLoading ? (
+          <div>Loading blogs…</div>
+        ) : blogsError ? (
+          <div className='text-red-600'>Error: {blogsError}</div>
+        ) : blogs.length === 0 ? (
+          <div>No blogs found.</div>
+        ) : (
+          <div className='overflow-x-auto'>
+            <table className='min-w-full border text-sm'>
+              <thead>
+                <tr className='bg-gray-100'>
+                  <th className='p-2 border'>Image</th>
+                  <th className='p-2 border'>Title</th>
+                  <th className='p-2 border'>Subtitle</th>
+                  <th className='p-2 border'>Created</th>
+                  <th className='p-2 border'>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {blogs.map((blog) => (
+                  <React.Fragment key={blog.id}>
+                    <tr className={editBlogId === blog.id ? 'bg-yellow-50' : ''}>
+                      <td className='border p-2'>
+                        {blog.image && <img src={blog.image} alt='' className='w-20 h-12 object-cover rounded' />}
+                      </td>
+                      <td className='border p-2'>
+                        {editBlogId === blog.id ? (
+                          <input className='border px-2 py-1 w-full' value={editFields.title} onChange={e => setEditFields(f => ({ ...f, title: e.target.value }))} />
+                        ) : blog.title}
+                      </td>
+                      <td className='border p-2'>
+                        {editBlogId === blog.id ? (
+                          <input className='border px-2 py-1 w-full' value={editFields.subtitle} onChange={e => setEditFields(f => ({ ...f, subtitle: e.target.value }))} />
+                        ) : blog.subtitle}
+                      </td>
+                      <td className='border p-2'>{new Date(blog.created_at || blog.createdAt || Date.now()).toLocaleString()}</td>
+                      <td className='border p-2'>
+                        {editBlogId === blog.id ? (
+                          <>
+                            <button className='px-2 py-1 bg-green-600 text-white rounded mr-2' onClick={() => saveEditBlog(blog.id)}>Save</button>
+                            <button className='px-2 py-1 bg-gray-300 rounded' onClick={cancelEditBlog}>Cancel</button>
+                          </>
+                        ) : (
+                          <>
+                            <button className='px-2 py-1 bg-blue-600 text-white rounded mr-2' onClick={() => startEditBlog(blog)}>Edit</button>
+                            <button className='px-2 py-1 bg-red-600 text-white rounded' disabled={deleteLoading === blog.id} onClick={() => handleDeleteBlog(blog.id)}>{deleteLoading === blog.id ? 'Deleting…' : 'Delete'}</button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                    {editBlogId === blog.id && (
+                      <tr>
+                        <td colSpan={5} className='border p-2 bg-yellow-50'>
+                          <div className='mb-2'>
+                            <label className='block text-xs font-medium mb-1'>Image URL</label>
+                            <input className='border px-2 py-1 w-full mb-2' value={editFields.image} onChange={e => setEditFields(f => ({ ...f, image: e.target.value }))} />
+                            <label className='block text-xs font-medium mb-1'>Markdown Content</label>
+                            <textarea className='border px-2 py-1 w-full' rows={6} value={editFields.content_markdown} onChange={e => setEditFields(f => ({ ...f, content_markdown: e.target.value }))} />
+                          </div>
+                          <div className='prose prose-xs bg-white p-2 rounded border'>
+                            <strong>Preview:</strong>
+                            <ReactMarkdown>{stripFrontmatter(editFields.content_markdown)}</ReactMarkdown>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
         </section>
       )}
 

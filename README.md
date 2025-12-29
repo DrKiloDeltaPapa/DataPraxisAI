@@ -34,6 +34,32 @@ A full-stack blog generation system powered by **Retrieval-Augmented Generation 
   └─────────────────────────────────────────┘
 ```
 
+
+## Features
+
+- Generate blogs using RAG + LLM with strict format (title, subtitle, date, image, markdown)
+- All blogs include a random image from `/src/assets/blog_pic_1.png` to `/blog_pic_14.png`
+- Admin dashboard: generate, edit, and delete blogs
+- Blog images always shown at the top; YAML frontmatter hidden from readers
+- Robust error handling and environment-driven config
+
+## API Endpoints
+
+- `POST /api/blog/generate` — Generate a new blog (RAG + LLM)
+- `GET /api/blogs` — List all blogs
+- `GET /api/blogs/{id}` — Get a single blog
+- `PUT /api/blogs/{id}` — Update a blog (title, subtitle, image, markdown, etc.)
+- `DELETE /api/blogs/{id}` — Delete a blog
+
+## Admin UI Usage
+
+- Go to `/admin` to:
+  - Generate new blogs
+  - Edit title, subtitle, image, and markdown for any blog
+  - Delete blogs
+  - All changes are persisted to the backend
+
+---
 ## Setup Instructions
 
 ### Prerequisites

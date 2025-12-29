@@ -1,4 +1,3 @@
-
 import os
 import json
 import logging
@@ -65,16 +64,20 @@ class BlogGenerateRequest(BaseModel):
     top_k: Optional[int] = None
 
 
+class BlogUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    subtitle: Optional[str] = None
+    content_markdown: Optional[str] = None
+    image: Optional[str] = None
+    audience: Optional[str] = None
+    length: Optional[str] = None
+
+
 def _read_blogs():
     if not os.path.exists(BLOGS_FILE):
         return []
     with open(BLOGS_FILE, 'r', encoding='utf-8') as f:
         return json.load(f)
-
-
-@app.get('/api/blogs')
-def get_blogs():
-    return _read_blogs()
 
 
 @app.post('/api/generate')
@@ -85,24 +88,30 @@ def generate(req: GenerateRequest):
         # fallback: return mock generation
         return {'content': f'Generated (mock) for prompt: {req.prompt}', 'sources': []}
     results = query(emb, top_k=req.n_results)
-    # build a simple answer using retrieved texts
-    combined = "\n\n".join([r[1]['text'] for r in results])
-    answer = f"[RAG answer]\n\nContext:\n{combined}\n\nResponse for prompt: {req.prompt}"
-    return {'content': answer, 'sources': [r[1] for r in results]}
+    out = []
+    for score, item in results:
+        out.append({
+            'score': float(score),
+            'doc_id': item.get('doc_id'),
+            'chunk_id': item.get('chunk_id'),
+            'text': item.get('text')
+        })
+    return {'content': f'Generated for prompt: {req.prompt}', 'sources': out}
 
 
 @app.post('/api/docs/ingest')
-def ingest_docs(payload: dict):
-    # payload should contain doc_id and text chunks
-    docs = payload.get('docs') or []
+def ingest(payload: dict):
+    """Ingest plain text; split into chunks and embed."""
+    text = payload.get('text')
+    doc_id = payload.get('doc_id', 'default')
+    if not text:
+        raise HTTPException(status_code=400, detail='text field required')
+    chunks = [text[i:i+500] for i in range(0, len(text), 500)]
     saved = 0
-    for doc in docs:
-        doc_id = doc.get('doc_id')
-        chunks = doc.get('chunks') or []
-        for idx, chunk in enumerate(chunks):
-            vec = embed_text(chunk)
-            add_embedding(doc_id, f"{idx}", vec, chunk)
-            saved += 1
+    for idx, chunk in enumerate(chunks):
+        vec = embed_text(chunk)
+        add_embedding(doc_id, f"{idx}", vec, chunk)
+        saved += 1
     return {'ingested': saved}
 
 
@@ -447,3 +456,38 @@ def get_blog(blog_id: str):
         if blog.get('id') == blog_id:
             return blog
     raise HTTPException(status_code=404, detail=f"Blog {blog_id} not found")
+@app.get('/api/blogs/{blog_id}')
+def get_blog(blog_id: str):
+    """Get a specific blog by ID."""
+    blogs = _read_blogs()
+    for blog in blogs:
+        if blog.get('id') == blog_id:
+            return blog
+    raise HTTPException(status_code=404, detail=f"Blog {blog_id} not found")
+
+
+@app.put('/api/blogs/{blog_id}')
+def update_blog(blog_id: str, update: BlogUpdateRequest):
+    """Update a blog post by ID."""
+    blogs = _read_blogs()
+    for i, blog in enumerate(blogs):
+        if blog.get('id') == blog_id:
+            for field, value in update.dict(exclude_unset=True).items():
+                blog[field] = value
+            blogs[i] = blog
+            with open(BLOGS_FILE, 'w', encoding='utf-8') as f:
+                json.dump(blogs, f, indent=2, ensure_ascii=False)
+            return blog
+    raise HTTPException(status_code=404, detail=f"Blog {blog_id} not found")
+
+
+@app.delete('/api/blogs/{blog_id}')
+def delete_blog(blog_id: str):
+    """Delete a blog post by ID."""
+    blogs = _read_blogs()
+    new_blogs = [b for b in blogs if b.get('id') != blog_id]
+    if len(new_blogs) == len(blogs):
+        raise HTTPException(status_code=404, detail=f"Blog {blog_id} not found")
+    with open(BLOGS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(new_blogs, f, indent=2, ensure_ascii=False)
+    return {"deleted": True, "id": blog_id}
