@@ -37,6 +37,26 @@ A full-stack blog generation system powered by **Retrieval-Augmented Generation 
 
 ## Features
 
+### Multi-agent pipeline
+
+The backend now routes all retrieval and generation work through a lightweight orchestration layer (see [ARCHITECTURE.md](ARCHITECTURE.md) for the full diagram):
+
+| Component | Responsibility |
+|-----------|----------------|
+| **Orchestrator** | Receives API requests, determines task order, aggregates agent traces + validation. |
+| **Retrieval agent** | Embeds the query/topic and queries FAISS/local/remote vector stores via `server/services/rag_client.py`, returning chunk text + metadata. |
+| **Reasoning agent** | Builds prompts from retrieved context and calls the configured LLM provider (Ollama/OpenAI/mock). |
+| **Validation agent** | Performs grounding checks (context presence, citation metadata) and surfaces warnings for the UI/logs. |
+
+Each API response now includes optional `validation` and `trace` payloads so clients can display provenance and debugging details.
+
+### Telemetry + traces
+
+- Every orchestrated `/api/rag/search` and `/api/blog/generate` run is persisted to `server/data/telemetry.db` (SQLite).
+- The new `GET /api/telemetry?limit=25` endpoint streams those rows back so the Admin UI can render a live timeline of retrieval chunks, validation status, and agent traces.
+- Telemetry rows capture the original request payload, chunk counts, duration (ms), validation findings, traces, and summarized sources/results for easy observability.
+- The broader eval + training workflow that builds on this telemetry lives in [MODEL_LIFECYCLE.md](MODEL_LIFECYCLE.md).
+
 - Generate blogs using RAG + LLM with strict format (title, subtitle, date, image, markdown)
 - All blogs include a random image from `/src/assets/blog_pic_1.png` to `/blog_pic_14.png`
 - Admin dashboard: generate, edit, and delete blogs
@@ -50,6 +70,7 @@ A full-stack blog generation system powered by **Retrieval-Augmented Generation 
 - `GET /api/blogs/{id}` — Get a single blog
 - `PUT /api/blogs/{id}` — Update a blog (title, subtitle, image, markdown, etc.)
 - `DELETE /api/blogs/{id}` — Delete a blog
+- `GET /api/telemetry` — Retrieve recent orchestrator runs for observability dashboards
 
 ## Admin UI Usage
 
@@ -137,6 +158,33 @@ npm install
 npm run dev
 ```
 
+Copy the frontend environment template if you plan to build static assets:
+
+```bash
+cp client/.env.example client/.env
+```
+
+- `VITE_BASE_PATH` controls the public path for bundled assets (leave `/` for local dev, set to `/DataPraxisAI/` for GitHub Pages).
+- `VITE_API_BASE` points the UI at a deployed FastAPI backend (leave blank locally to use the dev proxy, set to your Cloud Run / Render URL for static hosting).
+
+#### GitHub Pages / static hosting
+
+1. Set `VITE_BASE_PATH=/REPO_NAME/` and `VITE_API_BASE=https://your-backend.example.com` in `client/.env`.
+2. Run `npm run build` to produce `client/dist` with the correct public paths.
+3. Publish `client/dist` via GitHub Pages (e.g., push to a `gh-pages` branch or enable the Pages workflow) and update the repo “About” link to the published URL.
+4. Make sure the referenced backend is reachable over HTTPS and exposes the `/api/*` routes; GitHub Pages itself can only host the static frontend.
+
+## Evaluation & Training Lifecycle
+
+Use telemetry plus the helper scripts in this repo to prove every change is safe to ship:
+
+- **Ingestion & indexing** — Refresh embeddings via `server/scripts/ingest_pdfs.py` and `server/services/ingest.py`, then rebuild FAISS/SQLite metadata as needed with the helpers in `server/services/vector_store.py` and `server/services/db_access.py`.
+- **Telemetry reviews** — Inspect `server/data/telemetry.db` (also surfaced in the Admin UI) to compare chunk counts, validation warnings, and latency before/after a change.
+- **Dataset exports** — Run `export_training_dataset()` from `server/services/training.py` to produce JSONL prompt/completion files for fine-tuning or regression tests.
+- **Scoring & governance** — Follow the detailed playbook in [MODEL_LIFECYCLE.md](MODEL_LIFECYCLE.md) for checklists, annotation tips, and reporting expectations.
+
+Always reference the telemetry IDs or evaluation sheets from your testing when opening a PR so reviewers can replay the scenario.
+
 ### 5. Verify Setup
 
 1. Open Admin page: `http://localhost:5173/admin`
@@ -194,6 +242,14 @@ Response:
         "source_path": "/corpus/docs/handbook.pdf"
       }
     }
+  ],
+  "validation": {
+    "passed": true,
+    "findings": []
+  },
+  "trace": [
+    { "agent": "orchestrator", "status": "running", "detail": "search" },
+    { "agent": "retrieval", "status": "ok", "detail": "returned 8 chunks" }
   ]
 }
 ```
@@ -225,6 +281,14 @@ Response:
       "url": "...",
       "path": "..."
     }
+  ],
+  "validation": {
+    "passed": true,
+    "findings": []
+  },
+  "trace": [
+    { "agent": "retrieval", "status": "ok" },
+    { "agent": "reasoning", "status": "ok" }
   ]
 }
 ```
@@ -232,6 +296,33 @@ Response:
 #### RAG Status
 ```http
 GET /api/rag/status
+```
+
+#### Telemetry feed
+```http
+GET /api/telemetry?limit=20
+```
+
+Response:
+```json
+{
+  "limit": 20,
+  "events": [
+    {
+      "id": 14,
+      "created_at": "2024-07-04T02:15:01.982081",
+      "kind": "blog_generate",
+      "payload": {"topic": "Responsible AI", "audience": "technical"},
+      "chunk_count": 8,
+      "duration_ms": 4125.7,
+      "validation": {"passed": true, "findings": []},
+      "trace": [
+        {"agent": "orchestrator", "status": "running", "detail": "blog_generate"},
+        {"agent": "retrieval", "status": "ok", "detail": "8 chunks"}
+      ]
+    }
+  ]
+}
 ```
 
 ---
@@ -308,6 +399,15 @@ npm run build
   ```bash
   gunicorn -w 4 -k uvicorn.workers.UvicornWorker server.main:app
   ```
+
+### Container images & Cloud Run
+
+- **Backend Dockerfile**: [server/Dockerfile](server/Dockerfile) (Python 3.11 + Uvicorn, ready for Cloud Run `PORT=8080`).
+- **Frontend Dockerfile**: [client/Dockerfile](client/Dockerfile) (multi-stage Node build + nginx runtime).
+- **Global `.dockerignore`**: [./.dockerignore](.dockerignore) keeps FAISS indexes, node_modules, and local data out of image layers.
+- **Deployment playbook**: see [deployment/gcp/cloudrun.md](deployment/gcp/cloudrun.md) for Artifact Registry + Cloud Run steps and [deployment/gcp/cloudbuild.yaml](deployment/gcp/cloudbuild.yaml) for an automated build pipeline.
+
+> Tip: When running locally with Docker, mount your `.env` (or use `--env-file`) and, if needed, mount `/mnt/seagate_ai_corpus` as a read-only volume when building on Borg1.
 
 ---
 

@@ -1,10 +1,12 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
+import { defaultBlogImage } from '../utils/imageHelpers'
 
 const BlogCard = ({ blog }) => {
-    const { title, description, category, image } = blog
+        const { title, description, category } = blog
     const blogId = blog._id || blog.id
   const navigate = useNavigate()
+    const resolvedImage = blog.card_image || blog.image || defaultBlogImage
 
 return (
     <div
@@ -14,7 +16,7 @@ return (
         <div className='relative w-full h-48 overflow-hidden bg-gray-100 rounded-t-lg'>
             {/* decorative blurred background so the card area feels full while showing the whole image */}
             <img
-                src={image}
+                src={resolvedImage}
                 alt=""
                 aria-hidden="true"
                 className='absolute inset-0 w-full h-full object-cover filter blur-sm scale-105'
@@ -23,7 +25,7 @@ return (
             <div className='absolute inset-0 bg-black/20' aria-hidden='true' />
             <div className='relative z-10 w-full h-full flex items-center justify-center'>
                 <img
-                    src={image}
+                    src={resolvedImage}
                     alt={title}
                     loading="lazy"
                     className='max-h-full max-w-full object-contain object-center'
@@ -43,7 +45,7 @@ return (
                                     tmp.innerHTML = description || ''
                                     const text = tmp.textContent || tmp.innerText || ''
                                     return text.length > 120 ? text.slice(0, 117) + '...' : text
-                                } catch (e) {
+                                } catch {
                                     // fallback
                                     const txt = (description || '').replace(/<[^>]*>/g, '')
                                     return txt.length > 120 ? txt.slice(0, 117) + '...' : txt

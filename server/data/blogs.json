@@ -1,21 +1,33 @@
 [
   {
-    "_id": "675f1a01a3b4c9f0a1b2c301",
     "title": "How Deep Learning Models Actually Learn: Gradients, Loss, and Optimization",
-    "description": "Deep learning models may look like magic from the outside, but under the hood they are powered by relatively simple mathematical ideas.",
+    "description": "Loss functions, gradients, and iterative optimization steps power every deep learning system.",
     "category": "Deep Dives",
     "image": "/src/assets/blog_pic_1.png",
-    "createdAt": "2025-11-22T00:00:00.000Z",
-    "isPublished": true
+    "isPublished": true,
+    "id": "675f1a01a3b4c9f0a1b2c301",
+    "created_at": "2025-11-22T00:00:00.000Z",
+    "subtitle": "A practical walkthrough of how deep learning models actually learn",
+    "summary": "Loss functions, gradients, and optimization loops power every deep learning system; this primer explains each stage.",
+    "content_markdown": "# How Deep Learning Models Actually Learn: Gradients, Loss, and Optimization\n\nDeep learning models are not mystical black boxes—they optimize a loss function, follow the slope of the gradient, and iterate until the loss stops improving. Understanding those mechanics gives practitioners real leverage when debugging or improving a model.\n\n## 1. The Role of the Loss Function\n- Measures how far predictions are from labels.\n- Classification models often use cross-entropy; regression prefers mean squared error.\n- Lower loss equals better alignment with ground truth.\n\n## 2. Gradients and Backpropagation\n- Gradients capture how much each parameter contributes to the loss.\n- Backpropagation applies the chain rule layer by layer to compute those gradients efficiently.\n- Without gradients there is no signal to update millions of weights.\n\n## 3. Optimization Algorithms\n- Stochastic Gradient Descent (SGD) and its variants (Adam, RMSProp, momentum) update weights with the gradient signal.\n- Optimizers balance learning speed with stability, preventing divergence.\n\n## 4. Hyperparameters and Regularization\n- Learning rate controls the size of each update step.\n- Batch size affects gradient noise and convergence behavior.\n- Regularization (dropout, weight decay, early stopping) combats overfitting.\n\n## 5. Why This Matters in Practice\nWhen a model trains slowly or collapses entirely, tuning the loss, gradients, or optimizer usually fixes the issue faster than collecting more data. Treating deep learning as an inspectable optimization process—rather than magic—keeps projects on track.",
+    "audience": "technical",
+    "length": "long",
+    "sources": []
   },
   {
-    "_id": "675f1a01a3b4c9f0a1b2c302",
     "title": "Interpreting Black-Box Models: SHAP, LIME, and Model Explainability",
-    "description": "As ML systems move into high-stakes domains, model explainability becomes essential.",
+    "description": "SHAP, LIME, and other explanation techniques help regulated teams trust their AI systems.",
     "category": "Deep Dives",
     "image": "/src/assets/blog_pic_2.png",
-    "createdAt": "2025-11-22T00:00:00.000Z",
-    "isPublished": true
+    "isPublished": true,
+    "id": "675f1a01a3b4c9f0a1b2c302",
+    "created_at": "2025-11-22T00:00:00.000Z",
+    "subtitle": "Making black-box ML models more transparent and trustworthy",
+    "summary": "SHAP, LIME, and supporting tooling make local explanations for regulated, high-stakes ML deployments.",
+    "content_markdown": "# Interpreting Black-Box Models: SHAP, LIME, and Model Explainability\n\nDeploying machine learning in healthcare, finance, or education requires more than accuracy. Stakeholders must understand why a prediction occurred, which is where post-hoc explainability tools enter.\n\n## Why Explainability Matters\n- Builds trust with regulators, auditors, and business owners.\n- Surfaces bias or spurious correlations hidden in the data.\n- Documents limitations so downstream teams know when to defer to humans.\n\n## Local vs. Global Explanations\n- **Global** views describe overall model behavior (feature importances, partial dependence plots).\n- **Local** explanations justify single predictions, which is what SHAP and LIME specialize in.\n\n## LIME in Brief\n- Perturbs input features around one example.\n- Trains a simple surrogate (often linear) on that local neighborhood.\n- Reports which features pushed the prediction higher or lower.\n\n## SHAP in Brief\n- Uses Shapley values from cooperative game theory for additive explanations.\n- Ensures consistency: features that matter more receive larger contributions across samples.\n\n## Practical Considerations\n- Combine multiple methods; explanations are approximations.\n- Sanity-check results with domain experts instead of treating plots as gospel.\n- Automate reports so explainability becomes part of CI/CD, not a one-off exercise.\n\nExplainability tooling turns black-box models into accountable systems that align with responsible AI standards.",
+    "audience": "business",
+    "length": "medium",
+    "sources": []
   },
   {
     "id": "0c67ffd2",
@@ -89,7 +101,8 @@
         "url": "",
         "path": ""
       }
-    ]
+    ],
+    "image": "/src/assets/blog_pic_4.png"
   },
   {
     "id": "990561b1",
@@ -163,7 +176,8 @@
         "url": "",
         "path": ""
       }
-    ]
+    ],
+    "image": "/src/assets/blog_pic_5.png"
   },
   {
     "id": "e77be38b",

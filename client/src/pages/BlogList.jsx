@@ -1,7 +1,12 @@
 import React from 'react'
-import { blog_data, blogCategories } from '../assets/assets'
+import { useNavigate } from 'react-router-dom'
+import { blog_data, blogCategories, blogIllustrationList } from '../assets/assets'
 import { motion } from 'motion/react'
 import BlogCard from '../components/BlogCard'
+import { resolveBlogImage, defaultBlogImage } from '../utils/imageHelpers'
+import { apiFetch } from '../utils/api'
+
+const AnimatedPill = motion.div
 
 // Frontend will call backend /api endpoints (proxied in Vite config).
 // This component fetches blogs from the backend, falls back to static
@@ -9,6 +14,8 @@ import BlogCard from '../components/BlogCard'
 // to generate an AI post via POST /api/generate.
 
 const BlogList = () => {
+
+  const navigate = useNavigate()
 
   const [menu, setMenu] = React.useState("All")
   const [prefersReducedMotion, setPrefersReducedMotion] = React.useState(false)
@@ -20,6 +27,31 @@ const BlogList = () => {
   const [ingestStatus, setIngestStatus] = React.useState(null)
   const [showAdminMenu, setShowAdminMenu] = React.useState(false)
 
+  const categoryPanels = React.useMemo(() => ({
+    'Case Studies': {
+      eyebrow: 'Enterprise wins',
+      title: 'How teams shipped measurable impact',
+      description:
+        'Each case study distills a real deployment: the messy constraints, the telemetry we captured, and the governance signals that proved the rollout was safe. Use them as templates when you need to persuade stakeholders.',
+      bullets: [
+        'Before / after metrics for latency, accuracy, and support load',
+        'Architecture diagrams that highlight retrieval flow and evaluators',
+        'Ops checklist covering ingestion, monitoring, and playbooks'
+      ]
+    },
+    'The Stack': {
+      eyebrow: 'Reference architecture',
+      title: 'Opinionated blueprints for your AI platform',
+      description:
+        'The Stack posts keep the conversation tactical—what runs on the edge, what stays in the core platform, and which guardrails catch regressions before they go live.',
+      bullets: [
+        'Side-by-side comparisons of orchestration patterns',
+        'Cost envelopes for hosted vs. self-managed model mixes',
+        'Evaluation harnesses that tie back to telemetry traces'
+      ]
+    }
+  }), [])
+
   React.useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -30,31 +62,48 @@ const BlogList = () => {
   }, [])
 
   // Fetch blogs from backend on mount; fall back to static data on error
+  const normalizeBlogs = (list) => {
+    return (Array.isArray(list) ? list : []).map((b) => {
+      const resolvedImage = resolveBlogImage(b.image)
+      return {
+        ...b,
+        id: b.id || b._id || `blog-${Math.random().toString(36).slice(2, 8)}`,
+        _id: b.id || b._id || `blog-${Math.random().toString(36).slice(2, 8)}`,
+        category: b.category || 'AI Generated',
+        description: b.description || b.content_markdown || b.text || '',
+        image: resolvedImage || defaultBlogImage,
+      }
+    })
+  }
+
+  const assignCardImages = (list) =>
+    (list || []).map((blog, idx) => ({
+      ...blog,
+      card_image: blogIllustrationList[idx % blogIllustrationList.length],
+    }))
+
   React.useEffect(() => {
     let mounted = true
     setLoading(true)
-    fetch('/api/blogs')
+    apiFetch('/api/blogs')
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.json()
       })
       .then((data) => {
         if (!mounted) return
-        const normalized = (Array.isArray(data) ? data : []).map((b) => ({
-          ...b,
-          _id: b._id || b.id || `blog-${Math.random().toString(36).slice(2, 8)}`,
-          category: b.category || 'AI Generated',
-          description: b.description || b.content_markdown || b.text || '',
-          image: b.image || '',
-        }))
-        setBlogs(normalized)
+        const remoteBlogs = normalizeBlogs(data)
+        const remoteIds = new Set(remoteBlogs.map((b) => b._id))
+        const fallbackBlogs = normalizeBlogs(blog_data).filter((local) => !remoteIds.has(local._id))
+        const merged = assignCardImages([...remoteBlogs, ...fallbackBlogs])
+        setBlogs(merged)
         setError(null)
       })
       .catch((err) => {
         // fallback to packaged static data
         console.warn('Failed to load /api/blogs, falling back to local data:', err)
         if (!mounted) return
-        setBlogs(blog_data || [])
+        setBlogs(assignCardImages(normalizeBlogs(blog_data)))
         setError(err.message)
       })
       .finally(() => mounted && setLoading(false))
@@ -63,31 +112,33 @@ const BlogList = () => {
     }
   }, [])
 
-  // Small helper: call the backend generate endpoint and insert the result
+  // Small helper: call the backend multi-agent endpoint and insert the result
   const handleGenerate = async () => {
     const prompt = window.prompt('Enter prompt for AI blog generation')
     if (!prompt) return
     try {
       setLoading(true)
-      const res = await fetch('/api/generate', {
+      const res = await apiFetch('/api/blog/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, n_results: 3 }),
+        body: JSON.stringify({ topic: prompt, audience: 'general', length: 'medium' }),
       })
       const body = await res.json()
-      const content = body.content || 'Generated content'
-      // create a lightweight blog object and prepend it to the list
-      const newBlog = {
-        _id: `gen-${Date.now()}`,
-        title: (content || '').split('\n')[0].slice(0, 80) || 'AI Generated Post',
-        description: content,
-        category: 'AI Generated',
-        image: '',
-        createdAt: new Date().toISOString(),
-        isPublished: false,
+      if (!res.ok) {
+        throw new Error(body?.detail || 'Generation failed')
       }
-      setBlogs((s) => [newBlog, ...(s || [])])
-      alert('Generated content added to the top of the list (draft).')
+      const content = body.content_markdown || body.content || ''
+      // create a lightweight blog object and prepend it to the list
+      const normalizedNewBlog = normalizeBlogs([
+        {
+          ...body,
+          description: content,
+          category: 'AI Generated',
+          created_at: body.created_at || new Date().toISOString(),
+        },
+      ])[0]
+      setBlogs((prev) => assignCardImages([normalizedNewBlog, ...(prev || [])]))
+      alert('Generated blog added to the top of the list.')
     } catch (e) {
       console.error(e)
       alert('Failed to generate content: ' + e.message)
@@ -98,6 +149,19 @@ const BlogList = () => {
 
   return (
     <div className='mx-auto px-4 max-w-6xl'>
+      <div className='w-full mb-8 rounded-3xl border border-primary/20 bg-linear-to-r from-indigo-50 via-white to-rose-50 p-6 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center'>
+        <div>
+          <p className='text-sm uppercase tracking-[0.2em] text-primary mb-2'>Live multi-agent demo</p>
+          <h3 className='text-2xl font-semibold text-slate-800 mb-1'>Telemetry-ready Admin Console</h3>
+          <p className='text-slate-600 max-w-2xl'>Inspect retrieval chunks, reasoning traces, and validation findings in real time. The new console streams every orchestrated run directly from the backend telemetry store.</p>
+        </div>
+        <button
+          onClick={() => navigate('/admin')}
+          className='px-5 py-2.5 rounded-full bg-primary text-white text-sm font-semibold shadow-sm hover:shadow-lg transition'
+        >
+          Launch Admin
+        </button>
+      </div>
       {/* Use flex-wrap so category pills move to the next line instead of overlapping
           and keep admin controls in a non-absolute area so they flow responsively. */}
       <div className='flex flex-wrap justify-between items-center gap-4 sm:gap-8 my-10'>
@@ -113,7 +177,7 @@ const BlogList = () => {
               >
                 {/* background pill only for selected item (animated when allowed) */}
                 {selected && (
-                  <motion.div
+                  <AnimatedPill
                     layout
                     initial={prefersReducedMotion ? undefined : { opacity: 0, scale: 0.98 }}
                     animate={prefersReducedMotion ? undefined : { opacity: 1, scale: 1 }}
@@ -131,7 +195,7 @@ const BlogList = () => {
         })}
         </div>
         {/* Desktop / wide screens: keep controls inline */}
-        <div className='hidden sm:flex flex-shrink-0 ml-4 mt-0 flex gap-2 items-center'>
+        <div className='hidden sm:flex shrink-0 ml-4 mt-0 gap-2 items-center'>
           <input
             value={ingestPath}
             onChange={(e) => setIngestPath(e.target.value)}
@@ -139,7 +203,7 @@ const BlogList = () => {
             title='Local path to ingest (server must have access)'
           />
           <button
-            onClick={() => fetch('/api/docs/status').then((r) => r.json()).then(setIngestStatus).catch((e) => setIngestStatus({ error: e.message }))}
+            onClick={() => apiFetch('/api/docs/status').then((r) => r.json()).then(setIngestStatus).catch((e) => setIngestStatus({ error: e.message }))}
             className='px-2 py-1 bg-gray-200 text-sm rounded'
             title='Fetch ingestion status'
           >
@@ -150,7 +214,7 @@ const BlogList = () => {
               if (!window.confirm(`Ingest files at ${ingestPath} ?`)) return
               try {
                 setIngesting(true)
-                const res = await fetch('/api/docs/ingest-path', {
+                const res = await apiFetch('/api/docs/ingest-path', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ path: ingestPath, recursive: true }),
@@ -202,7 +266,7 @@ const BlogList = () => {
               />
               <div className='flex gap-2 mb-2'>
                 <button
-                  onClick={() => fetch('/api/docs/status').then((r) => r.json()).then((s) => { setIngestStatus(s); setShowAdminMenu(false) }).catch((e) => setIngestStatus({ error: e.message }))}
+                  onClick={() => apiFetch('/api/docs/status').then((r) => r.json()).then((s) => { setIngestStatus(s); setShowAdminMenu(false) }).catch((e) => setIngestStatus({ error: e.message }))}
                   className='flex-1 px-2 py-1 bg-gray-200 text-sm rounded'
                 >
                   Status
@@ -212,7 +276,7 @@ const BlogList = () => {
                     if (!window.confirm(`Ingest files at ${ingestPath} ?`)) return
                     try {
                       setIngesting(true)
-                      const res = await fetch('/api/docs/ingest-path', {
+                      const res = await apiFetch('/api/docs/ingest-path', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ path: ingestPath, recursive: true }),
@@ -246,6 +310,18 @@ const BlogList = () => {
         </div>
       </div>
       <div>
+        {categoryPanels[menu] && (
+          <section className='mb-10 rounded-2xl border border-primary/10 bg-white/70 p-6 shadow-sm'>
+            <p className='text-xs uppercase tracking-[0.3em] text-primary mb-2'>{categoryPanels[menu].eyebrow}</p>
+            <h4 className='text-2xl font-semibold text-slate-900 mb-3'>{categoryPanels[menu].title}</h4>
+            <p className='text-sm text-slate-600 mb-4'>{categoryPanels[menu].description}</p>
+            <ul className='grid gap-2 text-sm text-slate-700 list-disc pl-5 sm:grid-cols-2'>
+              {categoryPanels[menu].bullets.map((point) => (
+                <li key={point}>{point}</li>
+              ))}
+            </ul>
+          </section>
+        )}
         {loading && <div className='text-center py-8'>Loading blogs...</div>}
         {!loading && error && (
           <div className='text-center py-4 text-sm text-red-600'>

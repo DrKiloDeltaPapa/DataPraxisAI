@@ -1,0 +1,15 @@
+# Global ignores for Docker builds
+.git
+.gitignore
+**/__pycache__
+**/*.pyc
+.env
+.env.*
+*.venv
+.venv
+node_modules
+client/node_modules
+client/dist
+server/data
+server/__pycache__
+**/.DS_Store

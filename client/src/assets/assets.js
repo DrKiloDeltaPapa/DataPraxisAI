@@ -57,7 +57,42 @@ export const assets = {
     dashboard_icon_2,
     dashboard_icon_3,
     dashboard_icon_4,
+    blog_pic_1,
+    blog_pic_2,
+    blog_pic_3,
+    blog_pic_4,
+    blog_pic_5,
+    blog_pic_6,
+    blog_pic_7,
+    blog_pic_8,
+    blog_pic_9,
+    blog_pic_10,
 }
+
+export const blogIllustrations = {
+  '/src/assets/blog_pic_1.png': blog_pic_1,
+  '/src/assets/blog_pic_2.png': blog_pic_2,
+  '/src/assets/blog_pic_3.png': blog_pic_3,
+  '/src/assets/blog_pic_4.png': blog_pic_4,
+  '/src/assets/blog_pic_5.png': blog_pic_5,
+  '/src/assets/blog_pic_6.png': blog_pic_6,
+  '/src/assets/blog_pic_7.png': blog_pic_7,
+  '/src/assets/blog_pic_8.png': blog_pic_8,
+  '/src/assets/blog_pic_9.png': blog_pic_9,
+  '/src/assets/blog_pic_10.png': blog_pic_10,
+  'blog_pic_1.png': blog_pic_1,
+  'blog_pic_2.png': blog_pic_2,
+  'blog_pic_3.png': blog_pic_3,
+  'blog_pic_4.png': blog_pic_4,
+  'blog_pic_5.png': blog_pic_5,
+  'blog_pic_6.png': blog_pic_6,
+  'blog_pic_7.png': blog_pic_7,
+  'blog_pic_8.png': blog_pic_8,
+  'blog_pic_9.png': blog_pic_9,
+  'blog_pic_10.png': blog_pic_10,
+}
+
+export const blogIllustrationList = Object.values(blogIllustrations)
 export const blogCategories = ['All', 'Deep Dives', 'Case Studies', 'The Stack', 'Industry Trends']
 
 export const blog_data = [

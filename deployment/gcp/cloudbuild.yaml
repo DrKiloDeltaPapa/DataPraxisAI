@@ -1,0 +1,49 @@
+substitutions:
+  _REGION: us-central1
+  _REPO: datapraxis
+  _TAG: latest
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: build-backend
+    args:
+      [
+        "build",
+        "-f",
+        "server/Dockerfile",
+        "-t",
+        "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:${_TAG}",
+        ".",
+      ]
+
+  - name: gcr.io/cloud-builders/docker
+    id: push-backend
+    args:
+      [
+        "push",
+        "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:${_TAG}",
+      ]
+
+  - name: gcr.io/cloud-builders/docker
+    id: build-frontend
+    args:
+      [
+        "build",
+        "-f",
+        "client/Dockerfile",
+        "-t",
+        "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:${_TAG}",
+        "client",
+      ]
+
+  - name: gcr.io/cloud-builders/docker
+    id: push-frontend
+    args:
+      [
+        "push",
+        "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:${_TAG}",
+      ]
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:${_TAG}
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/frontend:${_TAG}

@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { assets } from "../assets/assets";
+import { apiFetch } from "../utils/api";
 
 const Header = () => {
   // 🔹 Placeholder blog data (replace this later with your real blog posts)
@@ -13,11 +15,38 @@ const Header = () => {
 
   // 🔹 React state
   const [query, setQuery] = useState("");
+  const [telemetry, setTelemetry] = useState([]);
+  const [telemetryLoading, setTelemetryLoading] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    let abort = false;
+    setTelemetryLoading(true);
+    apiFetch("/api/telemetry?limit=4")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (abort) return;
+        setTelemetry(Array.isArray(data?.events) ? data.events : []);
+      })
+      .catch(() => {
+        if (!abort) setTelemetry([]);
+      })
+      .finally(() => !abort && setTelemetryLoading(false));
+    return () => {
+      abort = true;
+    };
+  }, []);
 
   // 🔹 Filtered results based on user input
   const filteredBlogs = blogData.filter((blog) =>
     blog.title.toLowerCase().includes(query.toLowerCase())
   );
+
+  const formatDuration = (ms) => {
+    if (typeof ms !== "number" || Number.isNaN(ms)) return "—";
+    if (ms < 1000) return `${ms.toFixed(0)} ms`;
+    return `${(ms / 1000).toFixed(2)} s`;
+  };
 
   return (
     <div className="mx-8 sm:mx-16 xl:mx-24 relative">
@@ -41,11 +70,29 @@ const Header = () => {
         </h1>
 
         {/* Subtext */}
-        <p className="text-gray-600 mt-6 max-w-2xl mx-auto text-base sm:text-lg leading-relaxed">
-          Data Praxis AI bridges cutting-edge research and real-world practice —
-          transforming data into actionable insights, building smarter systems,
-          and driving measurable impact.
-        </p>
+          <p className="text-gray-600 mt-6 max-w-2xl mx-auto text-base sm:text-lg leading-relaxed">
+            Data Praxis AI bridges cutting-edge research and real-world practice —
+            transforming data into actionable insights, building smarter systems,
+            and driving measurable impact.
+          </p>
+
+        <div className="flex flex-wrap justify-center gap-3 mt-6">
+          <button
+            type="button"
+              onClick={() => navigate("/admin")}
+            className="flex items-center gap-2 rounded-full bg-primary text-white px-6 py-2 text-sm shadow-md hover:shadow-lg transition"
+          >
+            View telemetry console
+            <img src={assets.arrow} className="w-3" alt="arrow" />
+          </button>
+          <button
+            type="button"
+              onClick={() => navigate("/blog")}
+            className="rounded-full border border-primary/40 px-6 py-2 text-sm text-primary hover:bg-primary/10 transition"
+          >
+            Browse articles
+          </button>
+        </div>
 
         {/* Search Bar */}
         <form
@@ -82,6 +129,61 @@ const Header = () => {
         <button className="bg-primary text-white px-6 py-2 rounded-full hover:bg-primary/80 transition">
           Read More
         </button>
+      </div>
+
+      {/* Live telemetry snapshot */}
+      <div className="mt-16">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-primary">Live multi-agent data</p>
+            <h3 className="text-2xl font-semibold text-gray-800">Latest orchestrator runs</h3>
+            <p className="text-gray-500 text-sm">
+              Pulled directly from the backend telemetry store so you always know what the agents are doing.
+            </p>
+          </div>
+          <button
+            onClick={() => navigate("/admin")}
+            className="px-4 py-2 rounded-full bg-slate-900 text-white text-sm"
+          >
+            Open console
+          </button>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {telemetryLoading && telemetry.length === 0 && (
+            <div className="col-span-full text-gray-500 text-sm">Loading recent runs…</div>
+          )}
+          {(telemetry || []).slice(0, 3).map((event) => (
+            <div
+              key={event.id}
+              className="rounded-2xl border border-gray-200 bg-white/80 backdrop-blur-sm p-5 shadow-sm"
+            >
+              <div className="flex justify-between items-start mb-2">
+                <span className="text-xs font-semibold tracking-[0.2em] text-gray-500">
+                  {event.kind.replace('_', ' ')}
+                </span>
+                <span className="text-xs text-gray-400">
+                  {new Date(event.created_at).toLocaleTimeString()}
+                </span>
+              </div>
+              <div className="text-lg font-semibold text-gray-800 mb-1">
+                {event.payload?.topic || event.payload?.query || 'Untitled run'}
+              </div>
+              <p className="text-sm text-gray-500 mb-3">
+                {event.chunk_count ?? '—'} chunks · {formatDuration(event.duration_ms)}
+              </p>
+              <div className="text-xs uppercase tracking-[0.3em] text-gray-500">
+                {event.validation?.passed === false
+                  ? `${event.validation.findings?.length || 0} warnings`
+                  : 'validated'}
+              </div>
+            </div>
+          ))}
+          {!telemetryLoading && telemetry.length === 0 && (
+            <div className="col-span-full text-sm text-gray-500">
+              Run a search or generate a blog to populate telemetry.
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 🔹 Dynamic search results */}

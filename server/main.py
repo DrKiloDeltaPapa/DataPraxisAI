@@ -1,7 +1,6 @@
 import os
 import json
 import logging
-import traceback
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,17 +18,26 @@ from server.config import (
     validate_config,
     log_config,
 )
+from server.agents.orchestrator import Orchestrator
+from server.schemas.rag import (
+    BlogGenerateRequest,
+    BlogRecord,
+    BlogUpdateRequest,
+    RAGSearchRequest,
+    TelemetryEvent,
+)
 from server.services.embeddings import embed_text
 from server.services.vector_store import add_embedding, query
 from server.services.ingest import ingest_dir
 from server.services.training import export_training_dataset
-from server.services.rag_client import get_rag_client
-from server.services.llm import generate_blog as llm_generate_blog, check_ollama_availability
+from server.services.llm import check_ollama_availability
+from server.storage import blog_store, telemetry_store
 
 APP_ROOT = os.path.dirname(__file__)
 DATA_DIR = os.path.join(APP_ROOT, 'data')
-BLOGS_FILE = os.path.join(DATA_DIR, 'blogs.json')
 EMB_FILE_PATH = os.path.join(DATA_DIR, 'embeddings.json')
+
+orchestrator = Orchestrator()
 
 app = FastAPI(title='RAG Blog Backend (scaffold)')
 
@@ -50,34 +58,6 @@ app.add_middleware(
 class GenerateRequest(BaseModel):
     prompt: str
     n_results: int = 3
-
-
-class RAGSearchRequest(BaseModel):
-    query: str
-    top_k: Optional[int] = None
-
-
-class BlogGenerateRequest(BaseModel):
-    topic: str
-    audience: str = "general"
-    length: str = "medium"
-    top_k: Optional[int] = None
-
-
-class BlogUpdateRequest(BaseModel):
-    title: Optional[str] = None
-    subtitle: Optional[str] = None
-    content_markdown: Optional[str] = None
-    image: Optional[str] = None
-    audience: Optional[str] = None
-    length: Optional[str] = None
-
-
-def _read_blogs():
-    if not os.path.exists(BLOGS_FILE):
-        return []
-    with open(BLOGS_FILE, 'r', encoding='utf-8') as f:
-        return json.load(f)
 
 
 @app.post('/api/generate')
@@ -240,26 +220,15 @@ def rag_search(req: RAGSearchRequest):
             "results": [],
         }
 
-    # Embed query
-    query_vector = embed_text(req.query)
-    if not query_vector:
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to embed query; check embeddings service"
-        )
+    request_payload = RAGSearchRequest(**req.dict())
+    if request_payload.top_k is None:
+        request_payload.top_k = CONFIG_TOP_K
 
-    # Determine top_k
-    top_k = req.top_k if req.top_k else CONFIG_TOP_K
-
-    # Search via RAG adapter
-    rag_client = get_rag_client()
-    results = rag_client.search(query_vector, top_k=top_k)
-
-    return {
-        "status": "ok",
-        "mode": RAG_MODE,
-        "results": results,
-    }
+    try:
+        response = orchestrator.search(request_payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return response.dict()
 
 
 @app.post('/api/blog/generate')
@@ -285,105 +254,37 @@ def blog_generate(req: BlogGenerateRequest):
             "sources": [...]
         }
     """
-    # Embed topic as query
-    query_vector = embed_text(req.topic)
-    if not query_vector:
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to embed topic"
-        )
+    request_payload = BlogGenerateRequest(**req.dict())
+    if request_payload.top_k is None:
+        request_payload.top_k = CONFIG_TOP_K
 
-    # Retrieve relevant chunks
-    top_k = req.top_k if req.top_k else CONFIG_TOP_K
-    rag_client = get_rag_client()
-    search_results = rag_client.search(query_vector, top_k=top_k)
+    try:
+        response = orchestrator.generate_blog(request_payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    # Build sources for response
-    sources = [
-        {
-            "id": r.get("id", ""),
-            "score": r.get("score", 0),
-            "title": r.get("source", {}).get("title", "Untitled"),
-            "author": r.get("source", {}).get("author", "Unknown"),
-            "url": r.get("source", {}).get("url", ""),
-            "path": r.get("source", {}).get("source_path", ""),
-        }
-        for r in search_results
-    ]
-
-    # Build context snippets for LLM
-    if search_results:
-        context_snippets = "\n\n".join(
-            f"**Source [{i+1}]: {r.get('source', {}).get('title', 'Untitled')}**\n"
-            f"{r.get('text', '')[:500]}..."
-            for i, r in enumerate(search_results[:5])
-        )
-    else:
-        context_snippets = "(No relevant content found in knowledge base)"
-
-    # Generate blog content via LLM
-    content_markdown = llm_generate_blog(
-        topic=req.topic,
-        context_snippets=context_snippets,
-        audience=req.audience,
-        length=req.length,
+    blog_record = BlogRecord(
+        id=response.id,
+        title=response.title,
+        subtitle=response.subtitle,
+        content_markdown=response.content_markdown,
+        created_at=response.created_at,
+        image=response.image,
+        audience=request_payload.audience,
+        length=request_payload.length,
+        sources=response.sources,
+        validation=response.validation,
+        trace=response.trace,
     )
 
-    # Generate blog ID and timestamp
-    import uuid
-    from datetime import datetime
-    import random
-    blog_id = str(uuid.uuid4())[:8]
-    created_at = datetime.utcnow().isoformat()
-
-    # Select a random image from assets (blog_pic_1.png ... blog_pic_14.png)
-    image_choices = [f"/src/assets/blog_pic_{i}.png" for i in range(1, 15)]
-    image = random.choice(image_choices)
-
-    # Enforce new blog format in markdown (title, subtitle, date, image, structured markdown)
-    # If the LLM output does not include a title, prepend it
-    # We'll prepend a YAML frontmatter block for structure
-    title = req.topic
-    subtitle = f"A DataPraxisAI blog for {req.audience} readers"
-    date = created_at.split("T")[0]
-    frontmatter = f"""---\ntitle: {title}\nsubtitle: {subtitle}\ndate: {date}\nimage: {image}\n---\n\n"""
-    if not content_markdown.strip().lower().startswith("#") and not content_markdown.strip().lower().startswith("---"):
-        # Prepend title as H1 if not present
-        content_markdown = f"# {title}\n\n" + content_markdown
-    # Prepend frontmatter
-    content_markdown = frontmatter + content_markdown
-
-    # Persist to blogs.json
-    blogs = _read_blogs()
-    blog_entry = {
-        "id": blog_id,
-        "title": title,
-        "subtitle": subtitle,
-        "content_markdown": content_markdown,
-        "created_at": created_at,
-        "image": image,
-        "audience": req.audience,
-        "length": req.length,
-        "sources": sources,
-    }
-    blogs.append(blog_entry)
     try:
-        os.makedirs(DATA_DIR, exist_ok=True)
-        with open(BLOGS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(blogs, f, indent=2, ensure_ascii=False)
-    except Exception as e:
-        logging.warning(f"Could not persist blog to {BLOGS_FILE}: {e}")
-        # Non-fatal; still return blog even if persistence failed
+        blog_store.append_blog(blog_record)
+    except Exception as exc:  # pragma: no cover - defensive logging only
+        logging.warning(f"Could not persist blog: {exc}")
 
-    return {
-        "id": blog_id,
-        "title": title,
-        "subtitle": subtitle,
-        "content_markdown": content_markdown,
-        "created_at": created_at,
-        "image": image,
-        "sources": sources,
-    }
+    payload = response.dict()
+    payload["created_at"] = response.created_at.isoformat()
+    return payload
 
 
 @app.get('/api/rag/status')
@@ -404,6 +305,18 @@ def rag_status():
         "faiss_index_path": FAISS_INDEX_PATH if RAG_MODE == 'seagate' else None,
         "metadata_db_path": METADATA_DB_PATH if RAG_MODE == 'seagate' else None,
     }
+
+
+@app.get('/api/telemetry')
+def telemetry(limit: int = 25):
+    """Return the most recent orchestrator runs for observability dashboards."""
+    try:
+        events = telemetry_store.fetch_recent(limit=limit)
+    except Exception as exc:  # pragma: no cover - defensive logging only
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    payload = [TelemetryEvent(**event).dict() for event in events]
+    return {"events": payload, "limit": limit}
 
 
 @app.get('/api/llm/status')
@@ -443,51 +356,32 @@ def llm_status():
 @app.get('/api/blogs')
 def get_blogs():
     """Get list of all generated blogs."""
-    blogs = _read_blogs()
-    # Return in reverse chronological order
+    blogs = blog_store.load_blogs()
     return sorted(blogs, key=lambda b: b.get('created_at', ''), reverse=True)
 
 
 @app.get('/api/blogs/{blog_id}')
 def get_blog(blog_id: str):
     """Get a specific blog by ID."""
-    blogs = _read_blogs()
-    for blog in blogs:
-        if blog.get('id') == blog_id:
-            return blog
-    raise HTTPException(status_code=404, detail=f"Blog {blog_id} not found")
-@app.get('/api/blogs/{blog_id}')
-def get_blog(blog_id: str):
-    """Get a specific blog by ID."""
-    blogs = _read_blogs()
-    for blog in blogs:
-        if blog.get('id') == blog_id:
-            return blog
-    raise HTTPException(status_code=404, detail=f"Blog {blog_id} not found")
+    blog = blog_store.get_blog(blog_id)
+    if not blog:
+        raise HTTPException(status_code=404, detail=f"Blog {blog_id} not found")
+    return blog
 
 
 @app.put('/api/blogs/{blog_id}')
 def update_blog(blog_id: str, update: BlogUpdateRequest):
     """Update a blog post by ID."""
-    blogs = _read_blogs()
-    for i, blog in enumerate(blogs):
-        if blog.get('id') == blog_id:
-            for field, value in update.dict(exclude_unset=True).items():
-                blog[field] = value
-            blogs[i] = blog
-            with open(BLOGS_FILE, 'w', encoding='utf-8') as f:
-                json.dump(blogs, f, indent=2, ensure_ascii=False)
-            return blog
-    raise HTTPException(status_code=404, detail=f"Blog {blog_id} not found")
+    updated = blog_store.update_blog(blog_id, update.dict(exclude_unset=True))
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"Blog {blog_id} not found")
+    return updated
 
 
 @app.delete('/api/blogs/{blog_id}')
 def delete_blog(blog_id: str):
     """Delete a blog post by ID."""
-    blogs = _read_blogs()
-    new_blogs = [b for b in blogs if b.get('id') != blog_id]
-    if len(new_blogs) == len(blogs):
+    deleted = blog_store.delete_blog(blog_id)
+    if not deleted:
         raise HTTPException(status_code=404, detail=f"Blog {blog_id} not found")
-    with open(BLOGS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(new_blogs, f, indent=2, ensure_ascii=False)
     return {"deleted": True, "id": blog_id}
